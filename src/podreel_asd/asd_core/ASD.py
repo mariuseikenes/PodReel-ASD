@@ -5,8 +5,8 @@ import torch.nn.functional as F
 import sys, time, numpy, os, subprocess, pandas, tqdm
 from subprocess import PIPE
 
-from loss import lossAV, lossV
-from model.Model import ASD_Model
+from podreel_asd.asd_core.loss import lossAV, lossV
+from podreel_asd.asd_core.model.Model import ASD_Model
 
 
 class ASD(nn.Module):

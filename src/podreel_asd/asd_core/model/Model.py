@@ -1,8 +1,7 @@
 import torch
-import torch.nn as nn
-
-from model.Classifier import Fusion, Detector
-from model.Encoder import visual_encoder, audio_encoder
+from torch import nn
+from podreel_asd.asd_core.model.Classifier import Fusion, Detector
+from podreel_asd.asd_core.model.Encoder import visual_encoder, audio_encoder
 
 
 class ASD_Model(nn.Module):

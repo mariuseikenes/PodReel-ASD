@@ -6,7 +6,7 @@ from scipy.io import wavfile
 from scipy.interpolate import interp1d
 from sklearn.metrics import accuracy_score, f1_score
 
-from model.faceDetector.s3fd import S3FD
+from podreel_asd.asd_core.model.faceDetector.s3fd import S3FD
 from podreel_asd.asd_core.ASD import ASD
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
