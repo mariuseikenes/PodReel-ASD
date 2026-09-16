@@ -6,10 +6,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./ 
+COPY pyproject.toml uv.lock README.md ./ 
+COPY src ./src
 RUN pip install uv && uv sync --frozen --no-dev 
 
-COPY src ./src
 
 EXPOSE 8000 
 CMD ["uv", "run", "uvicorn", "podreel_asd.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -16,6 +16,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "torch>=2.14.0",
     "torchvision>=0.29.0",
+    "tqdm>=4.66.5",
     "uvicorn[standard]>=0.53.0",
 ]
 
