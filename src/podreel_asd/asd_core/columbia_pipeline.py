@@ -1,4 +1,5 @@
 import sys, time, os, tqdm, torch, argparse, glob, subprocess, warnings, cv2, pickle, numpy, pdb, math, python_speech_features
+from types import SimpleNamespace
 
 from scipy import signal
 from shutil import rmtree
@@ -8,105 +9,12 @@ from sklearn.metrics import accuracy_score, f1_score
 
 from podreel_asd.asd_core.model.faceDetector.s3fd import S3FD
 from podreel_asd.asd_core.ASD import ASD
+from pathlib import Path
 
+PACKAGE_DIR = Path(__file__).resolve().parent  # asd_core/
+WEIGHT_PATH = PACKAGE_DIR / "weight" / "pretrain_AVA.model"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 warnings.filterwarnings("ignore")
-
-parser = argparse.ArgumentParser(description="Columbia ASD Evaluation")
-
-parser.add_argument("--videoName", type=str, default="col", help="Demo video name")
-parser.add_argument(
-    "--videoFolder",
-    type=str,
-    default="colDataPath",
-    help="Path for inputs, tmps and outputs",
-)
-parser.add_argument(
-    "--pretrainModel",
-    type=str,
-    default="weight/pretrain_AVA.model",
-    help="Path for the pretrained model",
-)
-
-parser.add_argument(
-    "--nDataLoaderThread", type=int, default=10, help="Number of workers"
-)
-parser.add_argument(
-    "--facedetScale",
-    type=float,
-    default=0.25,
-    help="Scale factor for face detection, the frames will be scale to 0.25 orig",
-)
-parser.add_argument(
-    "--minTrack", type=int, default=10, help="Number of min frames for each shot"
-)
-parser.add_argument(
-    "--numFailedDet",
-    type=int,
-    default=10,
-    help="Number of missed detections allowed before tracking is stopped",
-)
-parser.add_argument(
-    "--minFaceSize", type=int, default=1, help="Minimum face size in pixels"
-)
-parser.add_argument("--cropScale", type=float, default=0.40, help="Scale bounding box")
-
-parser.add_argument("--start", type=int, default=0, help="The start time of the video")
-parser.add_argument(
-    "--duration",
-    type=int,
-    default=0,
-    help="The duration of the video, when set as 0, will extract the whole video",
-)
-
-parser.add_argument(
-    "--evalCol",
-    dest="evalCol",
-    action="store_true",
-    help="Evaluate on Columbia dataset",
-)
-parser.add_argument(
-    "--colSavePath",
-    type=str,
-    default="/colDataPath",
-    help="Path for inputs, tmps and outputs",
-)
-
-args = parser.parse_args()
-
-
-if args.evalCol == True:
-    # The process is: 1. download video and labels(I have modified the format of labels to make it easiler for using)
-    # 	              2. extract audio, extract video frames
-    #                 3. scend detection, face detection and face tracking
-    #                 4. active speaker detection for the detected face clips
-    #                 5. use iou to find the identity of each face clips, compute the F1 results
-    # The step 1 to 3 will take some time (That is one-time process). It depends on your cpu and gpu speed. For reference, I used 1.5 hour
-    # The step 4 and 5 need less than 10 minutes
-    # Need about 20G space finally
-    # ```
-    args.videoName = "col"
-    args.videoFolder = args.colSavePath
-    args.savePath = os.path.join(args.videoFolder, args.videoName)
-    args.videoPath = os.path.join(args.videoFolder, args.videoName + ".mp4")
-    args.duration = 0
-    if os.path.isfile(args.videoPath) == False:  # Download video
-        link = "https://www.youtube.com/watch?v=6GzxbrO0DHM&t=2s"
-        cmd = "youtube-dl -f best -o %s '%s'" % (args.videoPath, link)
-        output = subprocess.call(cmd, shell=True, stdout=None)
-    if os.path.isdir(args.videoFolder + "/col_labels") == False:  # Download label
-        link = "1Tto5JBt6NsEOLFRWzyZEeV6kCCddc6wv"
-        cmd = "gdown --id %s -O %s" % (link, args.videoFolder + "/col_labels.tar.gz")
-        subprocess.call(cmd, shell=True, stdout=None)
-        cmd = "tar -xzvf %s -C %s" % (
-            args.videoFolder + "/col_labels.tar.gz",
-            args.videoFolder,
-        )
-        subprocess.call(cmd, shell=True, stdout=None)
-        os.remove(args.videoFolder + "/col_labels.tar.gz")
-else:
-    args.videoPath = glob.glob(os.path.join(args.videoFolder, args.videoName + ".*"))[0]
-    args.savePath = os.path.join(args.videoFolder, args.videoName)
 
 
 def inference_video(args):
@@ -492,8 +400,7 @@ def evaluate_col_ASD(tracks, scores, args):
     print("Average F1:%.2f" % (100 * (F1s / 5)))
 
 
-# Main function
-def main():
+def run_pipeline(video_name: str, video_folder: str, output_dir: str):
     # This preprocesstion is modified based on this [repository](https://github.com/joonson/syncnet_python).
     # ```
     # .
@@ -520,12 +427,29 @@ def main():
     # ```
 
     # Initialization
-    args.pyaviPath = os.path.join(args.savePath, "pyavi")
-    args.pyframesPath = os.path.join(args.savePath, "pyframes")
-    args.pyworkPath = os.path.join(args.savePath, "pywork")
-    args.pycropPath = os.path.join(args.savePath, "pycrop")
-    if os.path.exists(args.savePath):
-        rmtree(args.savePath)
+
+    args = SimpleNamespace(
+        videoPath=glob.glob(os.path.join(video_folder, video_name + ".*"))[0],
+        savePath=output_dir,
+        pyaviPath=os.path.join(output_dir, "pyavi"),
+        pyframesPath=os.path.join(output_dir, "pyframes"),
+        pyworkPath=os.path.join(output_dir, "pywork"),
+        pycropPath=os.path.join(output_dir, "pycrop"),
+        duration=0,
+        nDataLoaderThread=10,
+        facedetScale=0.75,
+        minTrack=10,
+        numFailedDet=10,
+        minFaceSize=1,
+        cropScale=0.40,
+        start=0,
+        videoFolder=video_folder,
+        videoName=video_name,
+        pretrainModel=str(WEIGHT_PATH),
+    )
+
+    if os.path.exists(output_dir):
+        rmtree(output_dir)
     os.makedirs(
         args.pyaviPath, exist_ok=True
     )  # The path for the input video, input audio, output video
@@ -541,56 +465,38 @@ def main():
     args.videoFilePath = os.path.join(args.pyaviPath, "video.avi")
     # If duration did not set, extract the whole video, otherwise extract the video from 'args.start' to 'args.start + args.duration'
     if args.duration == 0:
-        command = (
-            "ffmpeg -y -i %s -qscale:v 2 -threads %d -async 1 -r 25 %s -loglevel panic"
-            % (args.videoPath, args.nDataLoaderThread, args.videoFilePath)
-        )
+        command = f"ffmpeg -y -i {args.videoPath} -qscale:v 2 -threads {args.nDataLoaderThread} -async 1 -r 25 {args.videoFilePath} -loglevel panic"
+
     else:
-        command = (
-            "ffmpeg -y -i %s -qscale:v 2 -threads %d -ss %.3f -to %.3f -async 1 -r 25 %s -loglevel panic"
-            % (
-                args.videoPath,
-                args.nDataLoaderThread,
-                args.start,
-                args.start + args.duration,
-                args.videoFilePath,
-            )
-        )
+        command = f"ffmpeg -y -i {args.videoPath} -qscale:v 2 -threads {args.nDataLoaderThread} -ss {args.start} -to {args.start+args.duration} -async 1 -r 25 {args.videoFilePath} -loglevel panic"
     subprocess.call(command, shell=True, stdout=None)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Extract the video and save in %s \r\n" % (args.videoFilePath)
+        + f" Extract the video and save in {args.videoFilePath} \r\n"
     )
 
     # Extract audio
     args.audioFilePath = os.path.join(args.pyaviPath, "audio.wav")
-    command = (
-        "ffmpeg -y -i %s -qscale:a 0 -ac 1 -vn -threads %d -ar 16000 %s -loglevel panic"
-        % (args.videoFilePath, args.nDataLoaderThread, args.audioFilePath)
-    )
+    command = f"ffmpeg -y -i {args.videoFilePath} -qscale:a 0 -ac 1 -vn -threads {args.nDataLoaderThread} -ar 16000 {args.audioFilePath} -loglevel panic"
     subprocess.call(command, shell=True, stdout=None)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Extract the audio and save in %s \r\n" % (args.audioFilePath)
+        + f" Extract the audio and save in {args.audioFilePath} \r\n"
     )
 
     # Extract the video frames
-    command = "ffmpeg -y -i %s -qscale:v 2 -threads %d -f image2 %s -loglevel panic" % (
-        args.videoFilePath,
-        args.nDataLoaderThread,
-        os.path.join(args.pyframesPath, "%06d.jpg"),
-    )
+    command = f"ffmpeg -y -i {args.videoFilePath} -qscale:v 2 -threads {args.nDataLoaderThread} -f image2 {os.path.join(args.pyframesPath, '%06d.jpg')} -loglevel panic"
     subprocess.call(command, shell=True, stdout=None)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Extract the frames and save in %s \r\n" % (args.pyframesPath)
+        + f" Extract the frames and save in {args.pyframesPath} \r\n"
     )
 
     # Face detection for the video frames
     faces = inference_video(args)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Face detection and save in %s \r\n" % (args.pyworkPath)
+        + f" Face detection and save in {args.pyworkPath} \r\n"
     )
 
     # Removed scene detection - replaced with one synthetic "scene"
@@ -608,7 +514,7 @@ def main():
             )  # 'frames' to present this tracks' timestep, 'bbox' presents the location of the faces
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Face track and detected %d tracks \r\n" % len(allTracks)
+        + f" Face track and detected {len(allTracks)} tracks \r\n"
     )
 
     # Face clips cropping
@@ -621,13 +527,13 @@ def main():
         pickle.dump(vidTracks, fil)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Face Crop and saved in %s tracks \r\n" % args.pycropPath
+        + f" Face Crop and saved in {args.pycropPath} tracks \r\n"
     )
     fil = open(savePath, "rb")
     vidTracks = pickle.load(fil)
 
     # Active Speaker Detection
-    files = glob.glob("%s/*.avi" % args.pycropPath)
+    files = glob.glob(f"{args.pycropPath}/*.avi")
     files.sort()
     scores = evaluate_network(files, args)
     savePath = os.path.join(args.pyworkPath, "scores.pckl")
@@ -635,11 +541,7 @@ def main():
         pickle.dump(scores, fil)
     sys.stderr.write(
         time.strftime("%Y-%m-%d %H:%M:%S")
-        + " Scores extracted and saved in %s \r\n" % args.pyworkPath
+        + f" Scores extracted and saved in {args.pyworkPath} \r\n"
     )
 
     visualization(vidTracks, scores, args)
-
-
-if __name__ == "__main__":
-    main()
