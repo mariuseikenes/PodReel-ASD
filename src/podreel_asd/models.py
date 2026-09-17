@@ -3,25 +3,25 @@ from pydantic.main import BaseModel
 
 class DetectRequest(BaseModel):
     clip_url: str  # Signed S3 Url
+    clip_id: str
+    clip_ext: str
 
 
-class SpeakerBox(BaseModel):
-    tracklet_id: str
+class Proc(BaseModel):
     x: float
     y: float
-    w: float
-    h: float
-    confidence: float
-    role: str  # speaking | reacting
+    s: float
 
 
-class Segment(BaseModel):
-    start: int
-    end: int
-    layout: str
-    speakers: list[SpeakerBox]
+class Detection(BaseModel):
+    conf: float
+    proc: Proc
+
+
+class DetectedFrame(BaseModel):
+    frame: int
+    detections: list[Detection]
 
 
 class DetectResponse(BaseModel):
-    clip_id: str
-    segments: list[Segment]
+    frames: list[DetectedFrame]
