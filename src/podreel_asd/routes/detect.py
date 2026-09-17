@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 from podreel_asd.asd_core.columbia_pipeline import run_pipeline
 from podreel_asd.models import DetectRequest, DetectResponse
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Path
-
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pathlib import Path
 from podreel_asd.services.format import format_detection
 
 router = APIRouter()
@@ -76,19 +76,11 @@ async def process_clip(job_id: str, req: DetectRequest):
             input_path.unlink(missing_ok=True)
             shutil.rmtree(work_dir, ignore_errors=True)
 
-        if req.webhook_url:
-            async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(
-                        req.webhook_url, json=jobs[job_id].model_dump(), timeout=10
-                    )
-                except Exception:
-                    print("Error in webhook")
-
 
 @router.post("/detect-active-faces")
 def detect_active_faces(req: DetectRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
+    print("Received request: " + req.clip_id)
     jobs[job_id] = Job(status=JobStatus.pending)
     background_tasks.add_task(process_clip, job_id, req)
     return {"job_id": job_id}

@@ -168,15 +168,8 @@ def evaluate_network(files, args):
     # durationSet = {1,2,4,6} # To make the result more reliable
     durationSet = {
         1,
-        1,
-        1,
         2,
-        2,
-        2,
-        3,
-        3,
         4,
-        5,
         6,
     }  # Use this line can get more reliable result
     for file in tqdm.tqdm(files, total=len(files)):
@@ -437,7 +430,7 @@ def run_pipeline(video_name: str, video_folder: str, output_dir: str):
         pycropPath=os.path.join(output_dir, "pycrop"),
         duration=0,
         nDataLoaderThread=10,
-        facedetScale=0.75,
+        facedetScale=0.50,
         minTrack=10,
         numFailedDet=10,
         minFaceSize=1,

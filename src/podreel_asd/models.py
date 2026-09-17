@@ -5,7 +5,6 @@ class DetectRequest(BaseModel):
     clip_url: str  # Signed S3 Url
     clip_id: str
     clip_ext: str
-    webhook_url: str
 
 
 class Proc(BaseModel):
