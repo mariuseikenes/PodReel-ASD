@@ -12,9 +12,9 @@ from podreel_asd.asd_core.model.Model import ASD_Model
 class ASD(nn.Module):
     def __init__(self, lr=0.001, lrDecay=0.95, **kwargs):
         super(ASD, self).__init__()
-        self.model = ASD_Model().to("cpu")
-        self.lossAV = lossAV().to("cpu")
-        self.lossV = lossV().to("cpu")
+        self.model = ASD_Model().cuda()
+        self.lossAV = lossAV().cuda()
+        self.lossV = lossV().cuda()
         self.optim = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=0.01)
         self.scheduler = torch.optim.lr_scheduler.StepLR(
             self.optim, step_size=1, gamma=lrDecay
@@ -39,7 +39,7 @@ class ASD(nn.Module):
             outsAV = self.model.forward_audio_visual_backend(audioEmbed, visualEmbed)
             outsV = self.model.forward_visual_backend(visualEmbed)
 
-            labels = labels[0].reshape((-1)).to("cpu")  # Loss
+            labels = labels[0].reshape((-1)).cuda()  # Loss
             nlossAV, _, _, prec = self.lossAV.forward(outsAV, labels)
             nlossV = self.lossV.forward(outsV, labels)
             nloss = nlossAV + 0.5 * nlossV
@@ -69,17 +69,15 @@ class ASD(nn.Module):
         predScores = []
         for audioFeature, visualFeature, labels in loader:
             with torch.no_grad():
-                audioEmbed = self.model.forward_audio_frontend(
-                    audioFeature[0].to("cpu")
-                )
+                audioEmbed = self.model.forward_audio_frontend(audioFeature[0].cuda())
                 visualEmbed = self.model.forward_visual_frontend(
-                    visualFeature[0].to("cpu")
+                    visualFeature[0].cuda()
                 )
                 outsAV = self.model.forward_audio_visual_backend(
                     audioEmbed, visualEmbed
                 )
                 labels = (
-                    labels[0].reshape((-1)).to("cpu")
+                    labels[0].reshape((-1)).cuda()
                 )  # dummy, required by lossAV signature
                 _, predScore, _, _ = self.lossAV.forward(outsAV, labels)
                 predScore = predScore[:, 1].detach().cpu().numpy()
@@ -91,7 +89,8 @@ class ASD(nn.Module):
 
     def loadParameters(self, path):
         selfState = self.state_dict()
-        loadedState = torch.load(path, map_location="cpu")
+        # loadedState = torch.load(path, map_location="cpu")
+        loadedState = torch.load(path)
         for name, param in loadedState.items():
             origName = name
             if name not in selfState:

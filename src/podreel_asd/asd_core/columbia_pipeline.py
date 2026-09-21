@@ -1,4 +1,4 @@
-import sys, time, os, tqdm, torch, argparse, glob, subprocess, warnings, cv2, pickle, numpy, pdb, math, python_speech_features
+import sys, time, os, tqdm, torch, glob, subprocess, warnings, cv2, pickle, numpy, math, python_speech_features
 from types import SimpleNamespace
 
 from scipy import signal
@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 
 def inference_video(args):
     # GPU: Face detection, output is the list contains the face location and score in this frame
-    DET = S3FD("cpu")
+    DET = S3FD(device="cuda")
     flist = glob.glob(os.path.join(args.pyframesPath, "*.jpg"))
     flist.sort()
     dets = []
@@ -32,9 +32,7 @@ def inference_video(args):
             dets[-1].append(
                 {"frame": fidx, "bbox": (bbox[:-1]).tolist(), "conf": bbox[-1]}
             )  # dets has the frames info, bbox info, conf info
-        sys.stderr.write(
-            "%s-%05d; %d dets\r" % (args.videoFilePath, fidx, len(dets[-1]))
-        )
+        print(f"{args.videoFilePath}-{fidx}; {len(dets[-1])} dets\r")
     savePath = os.path.join(args.pyworkPath, "faces.pckl")
     with open(savePath, "wb") as fil:
         pickle.dump(dets, fil)
@@ -213,7 +211,7 @@ def evaluate_network(files, args):
                             ]
                         )
                         .unsqueeze(0)
-                        .to("cpu")
+                        .cuda()
                     )
                     inputV = (
                         torch.FloatTensor(
@@ -222,7 +220,7 @@ def evaluate_network(files, args):
                             ]
                         )
                         .unsqueeze(0)
-                        .to("cpu")
+                        .cuda()
                     )
                     embedA = s.model.forward_audio_frontend(inputA)
                     embedV = s.model.forward_visual_frontend(inputV)
@@ -421,6 +419,7 @@ def run_pipeline(video_name: str, video_folder: str, output_dir: str):
 
     # Initialization
 
+    print("DEVICE: ", device)
     args = SimpleNamespace(
         videoPath=glob.glob(os.path.join(video_folder, video_name + ".*"))[0],
         savePath=output_dir,

@@ -6,7 +6,8 @@ from torchvision import transforms
 from .nets import S3FDNet
 from .box_utils import nms_
 
-PATH_WEIGHT = "src/podreel_asd/asd_core/model/faceDetector/s3fd/sfd_face.pth"
+_here = os.path.dirname(os.path.abspath(__file__))
+PATH_WEIGHT = os.path.join(_here, "sfd_face.pth")
 if os.path.isfile(PATH_WEIGHT) == False:
     Link = "1KafnHz7ccT-3IyddBsL5yi2xGtxAKypt"
     cmd = "gdown %s -O %s" % (Link, PATH_WEIGHT)
@@ -16,7 +17,7 @@ img_mean = np.array([104.0, 117.0, 123.0])[:, np.newaxis, np.newaxis].astype("fl
 
 class S3FD:
 
-    def __init__(self, device="cpu"):
+    def __init__(self, device="cuda"):
 
         tstamp = time.time()
         self.device = device

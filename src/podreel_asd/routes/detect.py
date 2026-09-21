@@ -7,6 +7,7 @@ import uuid
 from typing import Optional
 import httpx
 import asyncio
+import modal
 from pydantic import BaseModel
 
 from podreel_asd.asd_core.columbia_pipeline import run_pipeline
@@ -35,12 +36,13 @@ class Job(BaseModel):
 
 jobs: dict[str, Job] = {}
 
+_run_pipeline_gpu = modal.Function.from_name("lr-asd-podreel", "run_pipeline_gpu")
+
 
 async def process_clip(job_id: str, req: DetectRequest):
     async with pipeline_semaphore:
         jobs[job_id].status = JobStatus.running
         input_path = Path(f"/tmp/{req.clip_id}.{req.clip_ext}")
-        work_dir = Path(f"/tmp/{req.clip_id}")
 
         try:
             command = [
@@ -59,11 +61,9 @@ async def process_clip(job_id: str, req: DetectRequest):
             if result.returncode != 0:
                 raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None, run_pipeline, req.clip_id, "/tmp/", str(work_dir)
-            )
-            segments = format_detection(str(work_dir))
+            video_bytes = input_path.read_bytes()
+            print("Running function on Modal")
+            segments = await _run_pipeline_gpu.remote.aio(req.clip_id, video_bytes)
 
             jobs[job_id].result = DetectResponse(frames=segments)
             jobs[job_id].status = JobStatus.done
@@ -74,7 +74,6 @@ async def process_clip(job_id: str, req: DetectRequest):
 
         finally:
             input_path.unlink(missing_ok=True)
-            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 @router.post("/detect-active-faces")
