@@ -32,7 +32,7 @@ def inference_video(args):
             dets[-1].append(
                 {"frame": fidx, "bbox": (bbox[:-1]).tolist(), "conf": bbox[-1]}
             )  # dets has the frames info, bbox info, conf info
-        print(f"{args.videoFilePath}-{fidx}; {len(dets[-1])} dets\r")
+        # print(f"{args.videoFilePath}-{fidx}; {len(dets[-1])} dets\r")
     savePath = os.path.join(args.pyworkPath, "faces.pckl")
     with open(savePath, "wb") as fil:
         pickle.dump(dets, fil)
@@ -239,6 +239,8 @@ def visualization(tracks, scores, args):
     # CPU: visulize the result for video format
     flist = glob.glob(os.path.join(args.pyframesPath, "*.jpg"))
     flist.sort()
+    print(f"visualization flist count: {len(flist)}", flush=True)
+    print(f"visualization flist first entries: {flist[:5]}", flush=True)
     faces = [[] for i in range(len(flist))]
     for tidx, track in enumerate(tracks):
         score = scores[tidx]

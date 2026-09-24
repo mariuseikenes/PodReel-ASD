@@ -13,11 +13,6 @@ app = FastAPI(title="ASD Service")
 app.include_router(detect.router)
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"{device =}")
-print(f"{torch.get_num_threads()}")
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}

@@ -1,6 +1,8 @@
 # modal_app.py
 import modal
 
+from podreel_asd.services.probe import probe_video
+
 app = modal.App("lr-asd-podreel")
 
 image = (
@@ -31,7 +33,6 @@ weights_vol = modal.Volume.from_name("lr-asd-weights", create_if_missing=True)
 
 @app.function(image=image, gpu="L4", timeout=600, scaledown_window=60)
 def run_pipeline_gpu(clip_id: str, video_bytes: bytes) -> list:
-    print("Running Pipeling on Modal GPU")
     import sys, pathlib, tempfile
 
     sys.path.insert(0, "/root")
@@ -44,7 +45,19 @@ def run_pipeline_gpu(clip_id: str, video_bytes: bytes) -> list:
 
     input_path = pathlib.Path(tmp_dir) / f"{clip_id}.mp4"
     input_path.write_bytes(video_bytes)
+    probe_video(input_path)
+    try:
+        run_pipeline(clip_id, tmp_dir, str(work_dir))
+    finally:
+        frames_dir = work_dir / "pyframes"
+        frame_files = (
+            sorted(path for path in frames_dir.iterdir() if path.is_file())
+            if frames_dir.is_dir()
+            else []
+        )
 
-    run_pipeline(clip_id, tmp_dir, str(work_dir))
-    print("Returning formatted detection")
+        print(f"pyframes exists: {frames_dir.is_dir()}", flush=True)
+        print(f"pyframes file count: {len(frame_files)}", flush=True)
+        print(f"First pyframes files: {frame_files[:5]}", flush=True)
+        print("Returning formatted detection")
     return format_detection(str(work_dir))

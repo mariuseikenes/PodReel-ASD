@@ -15,6 +15,7 @@ from podreel_asd.models import DetectRequest, DetectResponse
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pathlib import Path
 from podreel_asd.services.format import format_detection
+from podreel_asd.services.probe import probe_video
 
 router = APIRouter()
 MAX_CONCURRENT_JOBS = 1  # tune to your GPU capacity
@@ -40,27 +41,45 @@ _run_pipeline_gpu = modal.Function.from_name("lr-asd-podreel", "run_pipeline_gpu
 
 
 async def process_clip(job_id: str, req: DetectRequest):
+    print("Process clip start")
     async with pipeline_semaphore:
         jobs[job_id].status = JobStatus.running
-        input_path = Path(f"/tmp/{req.clip_id}.{req.clip_ext}")
-
+        input_path = Path(f"/tmp/{req.clip_id}.mp4")
+        print("Past the input_path declaration")
+        # await execa`ffmpeg -ss ${clipRecord.startMs / 1000} -i "${presignedS3Url}" -t ${duration / 1000} -c copy ${outputPath} `;
         try:
             command = [
                 "ffmpeg",
+                "-y",
                 "-i",
                 req.clip_url,
+                "-ss",
+                str(req.start / 1000),
+                "-t",
+                str((req.end - req.start) / 1000),
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
                 "-c:v",
                 "libx264",
                 "-preset",
-                "slow",
-                "-crf",
-                "22",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
                 str(input_path),
             ]
             result = subprocess.run(command, capture_output=True, text=True)
             if result.returncode != 0:
                 raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 
+            print(f"Requested interval: {req.start}–{req.end} ms", flush=True)
+            print(f"ffmpeg exit code: {result.returncode}", flush=True)
+            print(f"ffmpeg stderr:\n{result.stderr}", flush=True)
+            probe_video(input_path)
+            print("After ffmpeg extract")
             video_bytes = input_path.read_bytes()
             print("Running function on Modal")
             segments = await _run_pipeline_gpu.remote.aio(req.clip_id, video_bytes)
@@ -69,6 +88,7 @@ async def process_clip(job_id: str, req: DetectRequest):
             jobs[job_id].status = JobStatus.done
 
         except Exception as e:
+            print(Exception, e)
             jobs[job_id].status = JobStatus.failed
             jobs[job_id].error = str(e)
 
@@ -82,6 +102,7 @@ def detect_active_faces(req: DetectRequest, background_tasks: BackgroundTasks):
     print("Received request: " + req.clip_id)
     jobs[job_id] = Job(status=JobStatus.pending)
     background_tasks.add_task(process_clip, job_id, req)
+    print("Returning response, background task added.")
     return {"job_id": job_id}
 
 
