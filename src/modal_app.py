@@ -57,8 +57,4 @@ def run_pipeline_gpu(clip_id: str, video_bytes: bytes) -> list:
             else []
         )
         frame_count = len(frame_files)
-        print(f"pyframes exists: {frames_dir.is_dir()}", flush=True)
-        print(f"pyframes file count: {len(frame_files)}", flush=True)
-        print(f"First pyframes files: {frame_files[:5]}", flush=True)
-        print("Returning formatted detection")
     return format_detection(str(work_dir), frame_count)

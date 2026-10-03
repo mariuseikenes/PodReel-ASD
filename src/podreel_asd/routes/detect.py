@@ -41,12 +41,9 @@ _run_pipeline_gpu = modal.Function.from_name("lr-asd-podreel", "run_pipeline_gpu
 
 
 async def process_clip(job_id: str, req: DetectRequest):
-    print("Process clip start")
     async with pipeline_semaphore:
         jobs[job_id].status = JobStatus.running
         input_path = Path(f"/tmp/{req.clip_id}.mp4")
-        print("Past the input_path declaration")
-        # await execa`ffmpeg -ss ${clipRecord.startMs / 1000} -i "${presignedS3Url}" -t ${duration / 1000} -c copy ${outputPath} `;
         try:
             command = [
                 "ffmpeg",
@@ -75,12 +72,7 @@ async def process_clip(job_id: str, req: DetectRequest):
             if result.returncode != 0:
                 raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 
-            print(f"Requested interval: {req.start}–{req.end} ms", flush=True)
-            print(f"ffmpeg exit code: {result.returncode}", flush=True)
-            probe_video(input_path)
-            print("After ffmpeg extract")
             video_bytes = input_path.read_bytes()
-            print("Running function on Modal")
             segments = await _run_pipeline_gpu.remote.aio(req.clip_id, video_bytes)
 
             jobs[job_id].result = DetectResponse(frames=segments)
@@ -98,10 +90,8 @@ async def process_clip(job_id: str, req: DetectRequest):
 @router.post("/detect-active-faces")
 def detect_active_faces(req: DetectRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
-    print("Received request: " + req.clip_id)
     jobs[job_id] = Job(status=JobStatus.pending)
     background_tasks.add_task(process_clip, job_id, req)
-    print("Returning response, background task added.")
     return {"job_id": job_id}
 
 
