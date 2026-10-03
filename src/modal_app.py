@@ -46,6 +46,7 @@ def run_pipeline_gpu(clip_id: str, video_bytes: bytes) -> list:
     input_path = pathlib.Path(tmp_dir) / f"{clip_id}.mp4"
     input_path.write_bytes(video_bytes)
     probe_video(input_path)
+    frame_count = 0
     try:
         run_pipeline(clip_id, tmp_dir, str(work_dir))
     finally:
@@ -55,9 +56,9 @@ def run_pipeline_gpu(clip_id: str, video_bytes: bytes) -> list:
             if frames_dir.is_dir()
             else []
         )
-
+        frame_count = len(frame_files)
         print(f"pyframes exists: {frames_dir.is_dir()}", flush=True)
         print(f"pyframes file count: {len(frame_files)}", flush=True)
         print(f"First pyframes files: {frame_files[:5]}", flush=True)
         print("Returning formatted detection")
-    return format_detection(str(work_dir))
+    return format_detection(str(work_dir), frame_count)

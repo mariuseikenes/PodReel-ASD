@@ -18,7 +18,7 @@ from podreel_asd.services.format import format_detection
 from podreel_asd.services.probe import probe_video
 
 router = APIRouter()
-MAX_CONCURRENT_JOBS = 1  # tune to your GPU capacity
+MAX_CONCURRENT_JOBS = 3  # tune to your GPU capacity
 pipeline_semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
 
 
@@ -77,7 +77,6 @@ async def process_clip(job_id: str, req: DetectRequest):
 
             print(f"Requested interval: {req.start}–{req.end} ms", flush=True)
             print(f"ffmpeg exit code: {result.returncode}", flush=True)
-            print(f"ffmpeg stderr:\n{result.stderr}", flush=True)
             probe_video(input_path)
             print("After ffmpeg extract")
             video_bytes = input_path.read_bytes()

@@ -1,36 +1,71 @@
-import numpy as np
+from pathlib import Path
 import pickle
 
+import numpy as np
 
-def format_detection(folder: str):
-    with open(folder + "/pywork/tracks.pckl", "rb") as f:
+
+def format_detection(folder: str, total_frames: int) -> list[dict]:
+    work = Path(folder) / "pywork"
+
+    with (work / "tracks.pckl").open("rb") as f:
         tracks = pickle.load(f)
 
-    with open(folder + "/pywork/scores.pckl", "rb") as f:
+    with (work / "scores.pckl").open("rb") as f:
         scores = pickle.load(f)
 
-    first_frame = 0
-    end_frame = tracks[-1]["track"]["frame"][-1]
-    formatted_frames = []
+    if len(tracks) != len(scores):
+        raise ValueError(
+            f"Expected one score array per track: "
+            f"{len(tracks)} tracks, {len(scores)} score arrays"
+        )
 
-    for frame in range(first_frame, end_frame + 1):
-        detections = []
-        for track, score in zip(tracks, scores):
-            track_frames = track["track"]["frame"]
-            if frame not in track_frames:
-                continue
+    formatted_frames = [
+        {"frame": frame, "detections": []} for frame in range(total_frames)
+    ]
+    for track_id, (track, track_scores) in enumerate(zip(tracks, scores, strict=True)):
+        frames = np.asarray(track["track"]["frame"])
+        if len(frames) != len(track_scores):
+            print(
+                f"Track {track_id}: frames={len(frames)}, "
+                f"scores={len(track_scores)}, "
+                f"first_frame={frames[0] if len(frames) else None}, "
+                f"last_frame={frames[-1] if len(frames) else None}"
+            )
+    for track_id, (track, scores_for_track) in enumerate(
+        zip(tracks, scores, strict=True)
+    ):
+        frames = np.asarray(track["track"]["frame"])
+        x = np.asarray(track["proc_track"]["x"])
+        y = np.asarray(track["proc_track"]["y"])
+        s = np.asarray(track["proc_track"]["s"])
+        values = np.asarray(scores_for_track)
 
-            idx = np.where(track_frames == frame)[0][0]
-            if idx >= len(score):
-                continue
+        track_length = len(frames)
+        lengths = (track_length, len(x), len(y), len(s))
+        missing_scores = track_length - len(values)
 
-            x = track["proc_track"]["x"][idx]
-            y = track["proc_track"]["y"][idx]
-            s = track["proc_track"]["s"][idx]
+        if len(set(lengths)) != 1 or not 0 <= missing_scores <= 2:
+            raise ValueError(
+                f"Track {track_id} has misaligned arrays: " f"{(*lengths, len(values))}"
+            )
 
-            conf = float(score[idx])
-            detections.append({"conf": conf, "proc": {"x": x, "y": y, "s": s}})
+        for index, source_frame in enumerate(frames[: len(values)]):
+            frame = int(source_frame)
+            if not 0 <= frame < total_frames:
+                raise ValueError(
+                    f"Track {track_id} contains out-of-range frame {frame}"
+                )
 
-        formatted_frames.append({"frame": frame, "detections": detections})
+            formatted_frames[frame]["detections"].append(
+                {
+                    "trackId": track_id,
+                    "score": float(values[index]),
+                    "proc": {
+                        "x": float(x[index]),
+                        "y": float(y[index]),
+                        "s": float(s[index]),
+                    },
+                }
+            )
 
     return formatted_frames

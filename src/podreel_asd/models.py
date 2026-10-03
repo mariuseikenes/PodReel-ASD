@@ -1,8 +1,8 @@
-from pydantic.main import BaseModel
+from pydantic import BaseModel
 
 
 class DetectRequest(BaseModel):
-    clip_url: str  # Signed S3 Url
+    clip_url: str  # Signed S3 URL
     clip_id: str
     clip_ext: str
     start: int
@@ -16,7 +16,8 @@ class Proc(BaseModel):
 
 
 class Detection(BaseModel):
-    conf: float
+    trackId: int
+    score: float  # Raw ASD score, not a probability
     proc: Proc
 
 

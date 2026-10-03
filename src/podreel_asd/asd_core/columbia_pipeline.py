@@ -239,8 +239,6 @@ def visualization(tracks, scores, args):
     # CPU: visulize the result for video format
     flist = glob.glob(os.path.join(args.pyframesPath, "*.jpg"))
     flist.sort()
-    print(f"visualization flist count: {len(flist)}", flush=True)
-    print(f"visualization flist first entries: {flist[:5]}", flush=True)
     faces = [[] for i in range(len(flist))]
     for tidx, track in enumerate(tracks):
         score = scores[tidx]
