@@ -1,11 +1,9 @@
 # app/routes/detect.py
 
 from enum import Enum
-import shutil
 import subprocess
 import uuid
 from typing import Optional
-import httpx
 import asyncio
 import modal
 from pydantic import BaseModel
@@ -15,10 +13,9 @@ from podreel_asd.models import DetectRequest, DetectResponse
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pathlib import Path
 from podreel_asd.services.format import format_detection
-from podreel_asd.services.probe import probe_video
 
 router = APIRouter()
-MAX_CONCURRENT_JOBS = 3  # tune to your GPU capacity
+MAX_CONCURRENT_JOBS = 2  # tune to your GPU capacity
 pipeline_semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
 
 
